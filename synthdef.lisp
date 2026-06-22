@@ -382,24 +382,26 @@
     (setf (synthdef-metadata synth key) value)))
 
 (defmacro defsynth (name params &body body)
-  (setf params (mapcar (lambda (param) (if (consp param) param (list param 0.0))) params))
-  (alexandria:with-gensyms (synthdef)
-    `(progn
-       (setf (synthdef-metadata ',name :name) ',name
-	     (synthdef-metadata ',name :controls) (mapcar (lambda (param) (append (list (car param)) (cdr param)))
-							  ',params)
-	     (synthdef-metadata ',name :body) ',body)
-       (let* ((,synthdef (make-instance 'synthdef :name ,(string-downcase name)))
-	      (*synthdef* ,synthdef))
-	 (with-controls (,@params)
-	   ,@(convert-code body)
-	   (build-synthdef ,synthdef)
-	   (when (and *s* (boot-p *s*))
-	     (ecase *synth-definition-mode*
-	       (:recv (recv-synthdef ,synthdef nil))
-	       (:load (load-synthdef ,synthdef nil)))
-	     (sync))
-	   ,synthdef)))))
+  (let ((params (mapcar (lambda (param) (if (consp param) param (list param 0.0))) params))
+        (meta-body body)
+        (body (cons (macroexpand-all (car body)) (cdr body))))
+    (alexandria:with-gensyms (synthdef)
+      `(progn
+         (setf (synthdef-metadata ',name :name) ',name
+               (synthdef-metadata ',name :controls) (mapcar (lambda (param) (append (list (car param)) (cdr param)))
+                                                            ',params)
+               (synthdef-metadata ',name :body) ',meta-body)
+         (let* ((,synthdef (make-instance 'synthdef :name ,(string-downcase name)))
+                (*synthdef* ,synthdef))
+           (with-controls (,@params)
+             ,@(convert-code body)
+             (build-synthdef ,synthdef)
+             (when (and *s* (boot-p *s*))
+               (ecase *synth-definition-mode*
+                 (:recv (recv-synthdef ,synthdef nil))
+                 (:load (load-synthdef ,synthdef nil)))
+               (sync))
+             ,synthdef))))))
 
 (defvar *temp-synth-name* "temp-synth")
 
@@ -418,7 +420,7 @@
                           with gain = (alexandria:ensure-list gain)
                           for i from 0 below (max (length bus) (length gain))
                           do (funcall f (,seqs i bus) (*~ (var-lag.kr (,seqs i gain) lag) result))))))
-         (let ((,result ,(convert-code body)))
+         (let ((,result ,(convert-code (macroexpand-all body))))
            (unless (eql :scalar (rate ,result))
              (setf ,fade-time ,fade)
              (destructuring-bind (,dt ,buses ,gate ,gain-sym ,lag-sym)

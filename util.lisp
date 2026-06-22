@@ -122,3 +122,20 @@
   (write-sequence (nreverse (osc::encode-int32 (* 4 (length sequence)))) stream)
   (dotimes (i (length sequence))
     (write-sequence (nreverse (osc::encode-float32 (float (elt sequence i) 1.0))) stream)))
+
+#+ccl
+(defun macroexpand-all (form &optional env)
+  (values (ccl:macroexpand-all form env) t t))
+
+#+ecl
+(defun macroexpand-all (form &optional env)
+  (values (walker:macroexpand-all form env) t t))
+
+#+lispworks
+(defun macroexpand-all (form &optional env)
+  (declare (ignore env))
+  (values (walker:walk-form form) t nil))
+
+#+sbcl
+(defun macroexpand-all (form &optional env)
+  (values (sb-cltl2:macroexpand-all form env) t t))
